@@ -3,7 +3,6 @@ from collections import defaultdict
 from multiprocessing import Pool
 from bs4 import BeautifulSoup
 from statistics import median
-import urllib.parse as up
 from math import ceil 
 import pandas as pd
 from data import *
@@ -11,12 +10,6 @@ import asyncio
 import aiohttp
 import json
 import re
-
-
-def convert_title_to_link(title: str) -> str:
-    encoded_title = up.quote_plus(title.replace(' ', '%20'), safe='%20')
-    link = 'https://steamcommunity.com/market/listings/730/' + encoded_title
-    return link
 
 
 def parse_html(html_content) -> list | None:
