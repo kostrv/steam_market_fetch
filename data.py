@@ -1,3 +1,5 @@
+import urllib.parse as up
+
 items = [
     "'Blueberries' Buckshot | NSWC SEAL",
     "'The Doctor' Romanov | Sabre",
