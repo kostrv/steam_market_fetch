@@ -48,16 +48,17 @@ items = [
     "Desert Eagle | Oxide Blaze (Factory New)"
 ]
 
-links = []
+items_links = []
 def convert_title_to_link(title: str) -> str:
     encoded_title = up.quote_plus(title.replace(' ', '%20'), safe='%20')
     link = 'https://steamcommunity.com/market/listings/730/' + encoded_title
     return link
+
 for item in items: 
-    links.append(convert_title_to_link(title=item))
+    items_links.append(convert_title_to_link(title=item))
 
 proxies = []
-for i in range(19100, 19999):
+for i in range(19300, 19999):
     proxy_data = {
         'user' : 'Lolobroller_17712',
         'pass' : 'yc44zbOJP8',
