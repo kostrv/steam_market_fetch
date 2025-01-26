@@ -102,7 +102,7 @@ def run_fetch(proxy : dict, url : str) -> dict[str : int | float]:
 if __name__ == '__main__':
     url = 'https://steamcommunity.com/market/listings/730/StatTrak%E2%84%A2%20AWP%20%7C%20Mortis%20%28Field-Tested%29'
     
-    sessions_count = 40
+    sessions_count = 10
     with Pool(processes=sessions_count) as pool:
         results = pool.starmap(run_fetch, [(proxies[i], items_links[i]) for i in range(sessions_count)])
         
