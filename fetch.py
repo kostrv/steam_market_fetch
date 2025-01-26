@@ -1,11 +1,10 @@
 from datetime import datetime, timedelta
+from data import items_links, proxies
 from collections import defaultdict
 from multiprocessing import Pool
 from bs4 import BeautifulSoup
 from statistics import median
 from math import ceil 
-import pandas as pd
-from data import *
 import asyncio
 import aiohttp
 import json
@@ -39,7 +38,7 @@ async def fetch_with_proxy(proxy : dict, url : str) -> str:
         return await fetch(session=session, url=url, proxy=proxy_url)
 
 
-def process_data(data: list[list[str]]) -> dict:
+def process_data(data: list[list[str]]) -> dict[str : int | float]:
     rows = []
     
     current_date = datetime.now().date()
@@ -74,8 +73,8 @@ def process_data(data: list[list[str]]) -> dict:
     total_month_sales = 0
     for item in list(sales_per_day.values()):
         total_month_sales += sum(item)
-    avg_day_sales = total_month_sales / 30      
-    avg_week_sales = total_month_sales / 4    
+    avg_day_sales = ceil(total_month_sales / 30)      
+    avg_week_sales = ceil(total_month_sales / 4)    
         
     res = {
         'total_month_sales' : total_month_sales,
@@ -86,7 +85,7 @@ def process_data(data: list[list[str]]) -> dict:
     return res 
     
     
-def run_fetch(proxy : dict, url : str):
+def run_fetch(proxy : dict, url : str) -> dict[str : int | float]:
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
@@ -95,13 +94,17 @@ def run_fetch(proxy : dict, url : str):
     
     raw_data = parse_html(html_content)
     item_data = process_data(raw_data)
+    item_data['url'] = url
     
-    return raw_data
+    return item_data
 
 
 if __name__ == '__main__':
     url = 'https://steamcommunity.com/market/listings/730/StatTrak%E2%84%A2%20AWP%20%7C%20Mortis%20%28Field-Tested%29'
     
-    sessions_count = 1
+    sessions_count = 40
     with Pool(processes=sessions_count) as pool:
-        results = pool.starmap(run_fetch, [(proxies[i], url) for i in range(sessions_count)])
+        results = pool.starmap(run_fetch, [(proxies[i], items_links[i]) for i in range(sessions_count)])
+        
+    for i in results:
+        print(i, end='\n\n')
