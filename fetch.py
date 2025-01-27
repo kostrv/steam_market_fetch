@@ -1,19 +1,80 @@
 from datetime import datetime, timedelta
 from data import items_links, proxies
 from collections import defaultdict
-from multiprocessing import Pool
 from bs4 import BeautifulSoup
 from statistics import median
 from math import ceil 
 import asyncio
 import aiohttp
+import logging
 import json
 import re
+import os 
 
+basedir = os.path.dirname(os.path.realpath(__file__))
 
-def parse_html(html_content) -> list | None:
+filename = 'parsing.log'
+if os.path.exists(path=filename): os.remove(path=filename)
+
+logging.basicConfig(
+    filename=os.path.join(basedir, 'parsing.log'),
+    level=logging.INFO,
+    encoding='utf-8',
+    format='%(asctime)s %(message)s',
+    datefmt='%m/%d/%Y %I:%M:%S %p'
+)
+
+tt_time = 2
+
+CONCURRENT_REQUESTS = 100
+semaphore = asyncio.Semaphore(CONCURRENT_REQUESTS)
+
+class ProxyManager:
+    def __init__(self, proxies):
+        self.proxies = proxies
+        self.current_index = 0
+
+    def get_next_proxy(self):
+        proxy = self.proxies[self.current_index]
+        self.current_index = (self.current_index + 1) % len(self.proxies)
+        
+        return f'http://{proxy['user']}:{proxy['pass']}@{proxy['host']}:{proxy['port']}'
+
+proxy_manager = ProxyManager(proxies=proxies)
+
+    
+async def fetch_with_proxy(session : aiohttp.ClientSession, url : str) -> str | None:
+    proxy = proxy_manager.get_next_proxy()
+
+    async with semaphore:
+        for attempt in range(5):
+            try:
+                async with session.get(url, proxy=proxy, timeout=10) as response:
+                    if response.status == 200:
+                        logging.info(f'Processed page: [URL] {url}')                        
+                        
+                        res = await response.text()
+                        
+                        if res: return res
+                        raise Exception(f'Invailid data fetched')
+                    else: 
+                        raise Exception(f'HTTP Error: {response.status}')
+
+            except Exception as exc:
+                logging.error(f'[ERROR] {exc} [URL] {url}')
+                
+                await asyncio.sleep(tt_time)
+
+                if attempt == 3: 
+                    proxy = proxy_manager.get_next_proxy()
+                    logging.info(f'Proxy has been changed for: [URL] {url}')
+                        
+                logging.info(f'Retrying: [URL] {url}')
+                
+
+def parse_html(html_content : str) -> list | None:
     soup = BeautifulSoup(html_content, 'html.parser')
-    script_tag = soup.find('script', text=re.compile(r'var line1='))
+    script_tag = soup.find('script', string=re.compile(r'var line1='))
     
     if script_tag:
         script_content = script_tag.string
@@ -24,21 +85,9 @@ def parse_html(html_content) -> list | None:
             return json.loads(data)
 
     return None
-
-
-async def fetch(session, url, proxy) -> str:
-    async with session.get(url, proxy=proxy) as response:
-        return await response.text()
-
-
-async def fetch_with_proxy(proxy : dict, url : str) -> str:
-    proxy_url = f'http://{proxy['user']}:{proxy['pass']}@{proxy['host']}:{proxy['port']}'
     
-    async with aiohttp.ClientSession() as session:
-        return await fetch(session=session, url=url, proxy=proxy_url)
 
-
-def process_data(data: list[list[str]]) -> dict[str : int | float]:
+def process_data(data: list[list[str]]) -> dict:
     rows = []
     
     current_date = datetime.now().date()
@@ -85,26 +134,35 @@ def process_data(data: list[list[str]]) -> dict[str : int | float]:
     return res 
     
     
-def run_fetch(proxy : dict, url : str) -> dict[str : int | float]:
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
+async def process_url(session: aiohttp.ClientSession, url: str) -> dict | None:
+    try:
+        html_content = await fetch_with_proxy(session=session, url=url)
+        if html_content is None:
+            logging.error(f'Failed to fetch content for URL: {url}')
+            return None
 
-    html_content = loop.run_until_complete(fetch_with_proxy(proxy=proxy, url=url))
-    loop.close()
-    
-    raw_data = parse_html(html_content)
-    item_data = process_data(raw_data)
-    item_data['url'] = url
-    
-    return item_data
+        raw_data = parse_html(html_content=html_content)
+        if raw_data is None:
+            logging.error(f'Failed to parse HTML content for URL: {url}')
+            return None
 
+        processed_data = process_data(data=raw_data)
+        return processed_data
+
+    except Exception as exc:
+         # В ходе тестирования в будущем добавил бы обработку возможных проблем
+         
+        logging.error(f'Error processing URL {url}: {exc}')
+        return None
+    
+            
+async def main() -> None:
+    async with aiohttp.ClientSession() as session:
+        tasks = [process_url(session=session, url=url) for url in items_links]
+        results = await asyncio.gather(*tasks, return_exceptions=False)
+        
+        for res in results:
+            print(res)
 
 if __name__ == '__main__':
-    url = 'https://steamcommunity.com/market/listings/730/StatTrak%E2%84%A2%20AWP%20%7C%20Mortis%20%28Field-Tested%29'
-    
-    sessions_count = 10
-    with Pool(processes=sessions_count) as pool:
-        results = pool.starmap(run_fetch, [(proxies[i], items_links[i]) for i in range(sessions_count)])
-        
-    for i in results:
-        print(i, end='\n\n')
+    asyncio.run(main())
