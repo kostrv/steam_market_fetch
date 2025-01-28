@@ -37,25 +37,3 @@ async def save_to_db(pool: aiomysql.Pool, data: dict) -> None:
                 data['median_price']
             ))
             await conn.commit()
-
-# async def execute_query(connection, query):
-#     async with connection.cursor() as cursor:
-#         try:
-#             await cursor.execute(query)
-#             result = await cursor.fetchall()
-#             return result
-#         except Exception as e:
-#             print(f'The error '{e}' occurred')
-#             return None
-
-    # connection = await create_connection('localhost', 'username', 'password', 'mydatabase')
-
-    # if connection:
-    #     select_query = 'SELECT * FROM parsed_data'
-    #     results = await execute_query(connection, select_query)
-
-    #     if results:
-    #         for row in results:
-    #             print(row)
-
-    #     connection.close()
