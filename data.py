@@ -98,8 +98,7 @@ items = [
     "AK-47 | Emerald Pinstripe (Factory New)",
     "AK-47 | Emerald Pinstripe (Field-Tested)",
     "AK-47 | Emerald Pinstripe (Minimal Wear)",
-    "AK-47 | Emerald Pinstripe (Well-Worn)",
-
+    "AK-47 | Emerald Pinstripe (Well-Worn)"
 ]
 
 items_links = []
@@ -109,10 +108,10 @@ def convert_title_to_link(title: str) -> str:
     return link
 
 for item in items: 
-    items_links.append(convert_title_to_link(title=item))
+    items_links.append([item, convert_title_to_link(title=item)])
 
 proxies = []
-for i in range(19000, 19999):
+for i in range(19500, 19999):
     proxy_data = {
         'user' : 'Lolobroller_17712',
         'pass' : 'yc44zbOJP8',
