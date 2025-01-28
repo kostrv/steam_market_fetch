@@ -111,7 +111,7 @@ for item in items:
     items_links.append([item, convert_title_to_link(title=item)])
 
 proxies = []
-for i in range(19500, 19999):
+for i in range(19000, 19999):
     proxy_data = {
         'user' : 'Lolobroller_17712',
         'pass' : 'yc44zbOJP8',
