@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from db import create_pool, save_to_db
 from data import items_links, proxies
 from collections import defaultdict
 from bs4 import BeautifulSoup
@@ -24,7 +25,8 @@ logging.basicConfig(
     datefmt='%m/%d/%Y %I:%M:%S %p'
 )
 
-tt_time = 2
+tt_time = 5
+attempts_count = 10
 
 CONCURRENT_REQUESTS = 100
 semaphore = asyncio.Semaphore(CONCURRENT_REQUESTS)
@@ -47,9 +49,9 @@ async def fetch_with_proxy(session : aiohttp.ClientSession, url : str) -> str | 
     proxy = proxy_manager.get_next_proxy()
 
     async with semaphore:
-        for attempt in range(5):
+        for attempt in range(attempts_count):
             try:
-                async with session.get(url, proxy=proxy, timeout=10) as response:
+                async with session.get(url, proxy=proxy, timeout=5) as response:
                     if response.status == 200:
                         logging.info(f'Processed page: [URL] {url}')                        
                         
@@ -70,7 +72,9 @@ async def fetch_with_proxy(session : aiohttp.ClientSession, url : str) -> str | 
                     logging.info(f'Proxy has been changed for: [URL] {url}')
                         
                 logging.info(f'Retrying: [URL] {url}')
-                
+        else: 
+            logging.error(f'[URL] {url} has not been processed.')
+            
 
 def parse_html(html_content : str) -> list | None:
     soup = BeautifulSoup(html_content, 'html.parser')
@@ -87,7 +91,7 @@ def parse_html(html_content : str) -> list | None:
     return None
     
 
-def process_data(data: list[list[str]]) -> dict:
+def process_data(data: list[list[str]], title : str) -> dict:
     rows = []
     
     current_date = datetime.now().date()
@@ -117,7 +121,7 @@ def process_data(data: list[list[str]]) -> dict:
         median_prices[day] = median(sorted(prices, reverse=True))
         sales_per_day[day] = sales_count
 
-    optimal_price = round(median(sorted(list(median_prices.values()), reverse=True)), 3)
+    median_price = round(median(sorted(list(median_prices.values()), reverse=True)), 3)
 
     total_month_sales = 0
     for item in list(sales_per_day.values()):
@@ -126,43 +130,53 @@ def process_data(data: list[list[str]]) -> dict:
     avg_week_sales = ceil(total_month_sales / 4)    
         
     res = {
+        'title' : title, 
         'total_month_sales' : total_month_sales,
         'avg_week_sales' : avg_week_sales,
         'avg_day_sales' : avg_day_sales, 
-        'optimal_price' : optimal_price}
+        'median_price' : median_price}
     
     return res 
     
     
-async def process_url(session: aiohttp.ClientSession, url: str) -> dict | None:
+async def process_url(session: aiohttp.ClientSession, pool, title: str, url: str) -> None:
     try:
         html_content = await fetch_with_proxy(session=session, url=url)
         if html_content is None:
-            logging.error(f'Failed to fetch content for URL: {url}')
+            logging.error(f'[ERROR] Failed to fetch content for {title} [URL] {url} ')
             return None
 
         raw_data = parse_html(html_content=html_content)
         if raw_data is None:
-            logging.error(f'Failed to parse HTML content for URL: {url}')
+            logging.error(f'[ERROR] Failed to parse HTML content for {title} [URL] {url}')
             return None
 
-        processed_data = process_data(data=raw_data)
+        processed_data = process_data(data=raw_data, title=title)
+
+        await save_to_db(pool, processed_data)
+        logging.info(f'Successfully saved in db {title} [URL] {url}')
+        
         return processed_data
 
     except Exception as exc:
          # В ходе тестирования в будущем добавил бы обработку возможных проблем
-         
-        logging.error(f'Error processing URL {url}: {exc}')
-        return None
+        
+        logging.error(f'[ERROR] Unable process {title} [URL] {url}')
+        raise
     
             
 async def main() -> None:
+    pool = await create_pool(host='localhost', username='username', password='password', db='mydatabase')
+    
     async with aiohttp.ClientSession() as session:
-        tasks = [process_url(session=session, url=url) for url in items_links]
-        results = await asyncio.gather(*tasks, return_exceptions=False)
+        tasks = [process_url(session=session, pool=pool, title=i_data[0], url=i_data[1]) for i_data in items_links]
+        result = await asyncio.gather(*tasks, return_exceptions=False)
+    
+    pool.close()
+    await pool.wait_closed()
+    
+    for res in result:
+        print(res)
         
-        for res in results:
-            print(res)
-
 if __name__ == '__main__':
     asyncio.run(main())
