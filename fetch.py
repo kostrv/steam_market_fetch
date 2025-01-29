@@ -26,7 +26,7 @@ logging.basicConfig(
 )
 
 tt_time = 5
-attempts_count = 10
+attempts_count = 15
 
 CONCURRENT_REQUESTS = 100
 semaphore = asyncio.Semaphore(CONCURRENT_REQUESTS)
