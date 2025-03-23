@@ -113,9 +113,9 @@ for item in items:
 proxies = []
 for i in range(19000, 19999):
     proxy_data = {
-        'user' : 'Lolobroller_17712',
-        'pass' : 'yc44zbOJP8',
-        'host' : 'ipv4.reproxy.network',
+        'user' : 'user',
+        'pass' : 'pass',
+        'host' : 'host',
         'port' : i
     }
     proxies.append(proxy_data)
