@@ -159,14 +159,12 @@ async def process_url(session: aiohttp.ClientSession, pool, title: str, url: str
         return processed_data
 
     except Exception as exc:
-         # В ходе тестирования в будущем добавил бы обработку возможных проблем
-        
         logging.error(f'[ERROR] Unable process {title} [URL] {url}')
         raise
     
             
 async def main() -> None:
-    pool = await create_pool(host='localhost', username='username', password='password', db='mydatabase')
+    pool = await create_pool(host='localhost', username='root', password='R3988793', db='mydatabase')
     
     async with aiohttp.ClientSession() as session:
         tasks = [process_url(session=session, pool=pool, title=i_data[0], url=i_data[1]) for i_data in items_links]
